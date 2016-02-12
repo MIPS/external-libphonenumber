@@ -1,11 +1,27 @@
+Feb 10, 2016: libphonenumber-7.2.5
+Metadata changes:
+ - Updated phone metadata for region code(s):
+   AG, AI, AS, BB, BM, BS, CA, DM, DO, ET, GD, GU, JM, KN, KY, LC, MP, MS, PR,
+   SE, SK, SX, TC, TT, US, VC, VG, VI
+ - Updated geocoding data for country calling code(s): 46 (en)
+ - Updated carrier data for country calling code(s): 251 (en)
+Code changes:
+ - Fix two places in demo where NPEs can occur on bad input.
+ - Fix an IllegalStateException when getMetadataForNonGeographicalRegion is
+   called with a country calling code which isn't a non-geographic entity.
+
 Jan 28, 2016: libphonenumber-7.2.4
 Metadata changes:
  - Updated phone metadata for region code(s):
    BW, CA, CI, CK, GM, IN, NA, NG, PG, TD, TM
  - Updated short number metadata for region code(s): PT
  - New geocoding data for country calling code(s): 1825 (en)
+ - Removed geocoding data for country calling code(s):
+   1726 (en), 1730 (en), 1838 (en), 1851 (en), 1888 (en), 225 (fr), 242 (fr),
+   269 (fr), 238(pt), 55 (pt)
  - Updated carrier data for country calling code(s):
    91 (en), 225 (en), 234 (en), 235 (en), 675 (en), 993 (en)
+ - First release to automatically remove obsolete geocoding files
 
 Jan 08, 2016: libphonenumber-7.2.3
 Metadata changes:
