@@ -17,8 +17,8 @@
 package com.google.i18n.phonenumbers;
 
 import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberType;
+import com.google.i18n.phonenumbers.Phonemetadata.PhoneNumberDesc;
 import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber;
-import com.google.i18n.phonenumbers.nano.Phonemetadata.PhoneNumberDesc;
 
 import junit.framework.TestCase;
 
@@ -142,10 +142,10 @@ public class ExampleNumbersTest extends TestCase {
     for (String regionCode : phoneNumberUtil.getSupportedRegions()) {
       PhoneNumber exampleNumber = null;
       PhoneNumberDesc desc =
-          phoneNumberUtil.getMetadataForRegion(regionCode).noInternationalDialling;
+          phoneNumberUtil.getMetadataForRegion(regionCode).getNoInternationalDialling();
       try {
-        if (!desc.exampleNumber.equals("")) {
-          exampleNumber = phoneNumberUtil.parse(desc.exampleNumber, regionCode);
+        if (desc.hasExampleNumber()) {
+          exampleNumber = phoneNumberUtil.parse(desc.getExampleNumber(), regionCode);
         }
       } catch (NumberParseException e) {
         LOGGER.log(Level.SEVERE, e.toString());
@@ -175,7 +175,21 @@ public class ExampleNumbersTest extends TestCase {
   public void testEveryRegionHasAnExampleNumber() throws Exception {
     for (String regionCode : phoneNumberUtil.getSupportedRegions()) {
       PhoneNumber exampleNumber = phoneNumberUtil.getExampleNumber(regionCode);
-      assertNotNull("None found for region " + regionCode, exampleNumber);
+      assertNotNull("No example number found for region " + regionCode, exampleNumber);
+    }
+  }
+
+  public void testEveryRegionHasAnInvalidExampleNumber() throws Exception {
+    for (String regionCode : phoneNumberUtil.getSupportedRegions()) {
+      PhoneNumber exampleNumber = phoneNumberUtil.getInvalidExampleNumber(regionCode);
+      assertNotNull("No invalid example number found for region " + regionCode, exampleNumber);
+    }
+  }
+
+  public void testEveryTypeHasAnExampleNumber() throws Exception {
+    for (PhoneNumberUtil.PhoneNumberType type : PhoneNumberUtil.PhoneNumberType.values()) {
+      PhoneNumber exampleNumber = phoneNumberUtil.getExampleNumberForType(type);
+      assertNotNull("No example number found for type " + type, exampleNumber);
     }
   }
 
@@ -199,10 +213,14 @@ public class ExampleNumbersTest extends TestCase {
       for (ShortNumberInfo.ShortNumberCost cost : ShortNumberInfo.ShortNumberCost.values()) {
         exampleShortNumber = shortNumberInfo.getExampleShortNumberForCost(regionCode, cost);
         if (!exampleShortNumber.equals("")) {
-          if (cost != shortNumberInfo.getExpectedCostForRegion(
-              phoneNumberUtil.parse(exampleShortNumber, regionCode), regionCode)) {
+          phoneNumber = phoneNumberUtil.parse(exampleShortNumber, regionCode);
+          ShortNumberInfo.ShortNumberCost exampleShortNumberCost =
+              shortNumberInfo.getExpectedCostForRegion(phoneNumber, regionCode);
+          if (cost != exampleShortNumberCost) {
             wrongTypeCases.add(phoneNumber);
-            LOGGER.log(Level.SEVERE, "Wrong cost for " + phoneNumber.toString());
+            LOGGER.log(Level.SEVERE, "Wrong cost for " + phoneNumber.toString()
+                + ": got " + exampleShortNumberCost
+                + ", expected: " + cost);
           }
         }
       }
@@ -216,9 +234,9 @@ public class ExampleNumbersTest extends TestCase {
     int wrongTypeCounter = 0;
     for (String regionCode : shortNumberInfo.getSupportedRegions()) {
       PhoneNumberDesc desc =
-          MetadataManager.getShortNumberMetadataForRegion(regionCode).emergency;
-      if (!desc.exampleNumber.equals("")) {
-        String exampleNumber = desc.exampleNumber;
+          MetadataManager.getShortNumberMetadataForRegion(regionCode).getEmergency();
+      if (desc.hasExampleNumber()) {
+        String exampleNumber = desc.getExampleNumber();
         PhoneNumber phoneNumber = phoneNumberUtil.parse(exampleNumber, regionCode);
         if (!shortNumberInfo.isPossibleShortNumberForRegion(phoneNumber, regionCode)
             || !shortNumberInfo.isEmergencyNumber(exampleNumber, regionCode)) {
@@ -239,9 +257,9 @@ public class ExampleNumbersTest extends TestCase {
     for (String regionCode : shortNumberInfo.getSupportedRegions()) {
       // Test the carrier-specific tag.
       PhoneNumberDesc desc =
-          MetadataManager.getShortNumberMetadataForRegion(regionCode).carrierSpecific;
-      if (!desc.exampleNumber.equals("")) {
-        String exampleNumber = desc.exampleNumber;
+          MetadataManager.getShortNumberMetadataForRegion(regionCode).getCarrierSpecific();
+      if (desc.hasExampleNumber()) {
+        String exampleNumber = desc.getExampleNumber();
         PhoneNumber carrierSpecificNumber = phoneNumberUtil.parse(exampleNumber, regionCode);
         if (!shortNumberInfo.isPossibleShortNumberForRegion(carrierSpecificNumber, regionCode)
             || !shortNumberInfo.isCarrierSpecific(carrierSpecificNumber)) {
