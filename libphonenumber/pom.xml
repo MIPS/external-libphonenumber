@@ -3,14 +3,14 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.googlecode.libphonenumber</groupId>
   <artifactId>libphonenumber</artifactId>
-  <version>7.2.6</version>
+  <version>7.7.0</version>
   <packaging>jar</packaging>
   <url>https://github.com/googlei18n/libphonenumber/</url>
 
   <parent>
     <groupId>com.googlecode.libphonenumber</groupId>
     <artifactId>libphonenumber-parent</artifactId>
-    <version>7.2.6</version>
+    <version>7.7.0</version>
   </parent>
 
   <build>
@@ -30,41 +30,26 @@
     </testResources>
     <plugins>
       <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <excludes>
-            <exclude>com/google/i18n/phonenumbers/SingleFileMetadataSourceImpl.class</exclude>
-            <exclude>com/google/i18n/phonenumbers/data/SingleFilePhoneNumberMetadataProto</exclude>
-          </excludes>
-        </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>2.4.2</version>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>animal-sniffer-maven-plugin</artifactId>
+        <version>1.15</version>
         <executions>
           <execution>
-            <phase>package</phase>
+            <phase>test</phase>
             <goals>
-              <goal>shade</goal>
+              <goal>check</goal>
             </goals>
           </execution>
         </executions>
+        <configuration>
+          <signature>
+            <groupId>org.codehaus.mojo.signature</groupId>
+            <artifactId>java15</artifactId>
+            <version>1.0</version>
+          </signature>
+        </configuration>
       </plugin>
     </plugins>
   </build>
-
-  <repositories>
-    <repository>
-      <id>protobuf-java-lib</id>
-      <url>file://${project.basedir}/../lib</url>
-    </repository>
-  </repositories>
-  <dependencies>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
-      <version>2.6.1</version>
-    </dependency>
-  </dependencies>
 
 </project>
