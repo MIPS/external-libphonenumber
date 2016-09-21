@@ -16,16 +16,16 @@
 
 package com.google.i18n.phonenumbers;
 
-import com.google.i18n.phonenumbers.nano.Phonemetadata.PhoneMetadata;
-import com.google.i18n.phonenumbers.nano.Phonemetadata.PhoneMetadataCollection;
-import com.google.protobuf.nano.CodedInputByteBufferNano;
+import com.google.i18n.phonenumbers.Phonemetadata.PhoneMetadata;
+import com.google.i18n.phonenumbers.Phonemetadata.PhoneMetadataCollection;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
@@ -36,13 +36,13 @@ import java.util.logging.Logger;
  * additional data files such as PhoneNumberAlternateFormats, but in the future it is envisaged it
  * would handle the main metadata file (PhoneNumberMetadata.xml) as well.
  */
-class MetadataManager {
+final class MetadataManager {
   private static final String ALTERNATE_FORMATS_FILE_PREFIX =
       "/com/google/i18n/phonenumbers/data/PhoneNumberAlternateFormatsProto";
   private static final String SHORT_NUMBER_METADATA_FILE_PREFIX =
       "/com/google/i18n/phonenumbers/data/ShortNumberMetadataProto";
 
-  private static final Logger LOGGER = Logger.getLogger(MetadataManager.class.getName());
+  private static final Logger logger = Logger.getLogger(MetadataManager.class.getName());
 
   private static final Map<Integer, PhoneMetadata> callingCodeToAlternateFormatsMap =
       Collections.synchronizedMap(new HashMap<Integer, PhoneMetadata>());
@@ -61,50 +61,52 @@ class MetadataManager {
   private MetadataManager() {
   }
 
-  private static void close(InputStream in) {
-    if (in != null) {
+  /**
+   * Loads and returns the metadata object from the given stream and closes the stream.
+   *
+   * @param source  the non-null stream from which metadata is to be read
+   * @return  the loaded metadata object
+   */
+  static PhoneMetadataCollection loadMetadataAndCloseInput(InputStream source) {
+    ObjectInputStream ois = null;
+    try {
       try {
-        in.close();
+        ois = new ObjectInputStream(source);
       } catch (IOException e) {
-        LOGGER.log(Level.WARNING, e.toString());
+        throw new RuntimeException("cannot load/parse metadata", e);
+      }
+      PhoneMetadataCollection metadataCollection = new PhoneMetadataCollection();
+      try {
+        metadataCollection.readExternal(ois);
+      } catch (IOException e) {
+        throw new RuntimeException("cannot load/parse metadata", e);
+      }
+      return metadataCollection;
+    } finally {
+      try {
+        if (ois != null) {
+          // This will close all underlying streams as well, including source.
+          ois.close();
+        } else {
+          source.close();
+        }
+      } catch (IOException e) {
+        logger.log(Level.WARNING, "error closing input stream (ignored)", e);
       }
     }
-  }
-
-  // The size of the byte buffer used for deserializing the alternate formats and short number
-  // metadata files for each region.
-  private static final int BUFFER_SIZE = 16 * 1024;
-
-  static CodedInputByteBufferNano convertStreamToByteBuffer(ObjectInputStream in, int bufferSize)
-      throws IOException {
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    int nRead;
-    byte[] data = new byte[bufferSize];
-
-    while ((nRead = in.read(data, 0, bufferSize)) != -1) {
-      outputStream.write(data, 0, nRead);
-    }
-
-    outputStream.flush();
-    return CodedInputByteBufferNano.newInstance(outputStream.toByteArray());
   }
 
   private static void loadAlternateFormatsMetadataFromFile(int countryCallingCode) {
-    InputStream source = PhoneNumberMatcher.class.getResourceAsStream(
-        ALTERNATE_FORMATS_FILE_PREFIX + "_" + countryCallingCode);
-    ObjectInputStream in = null;
-    try {
-      in = new ObjectInputStream(source);
-      CodedInputByteBufferNano byteBuffer = convertStreamToByteBuffer(in, BUFFER_SIZE);
-      PhoneMetadataCollection alternateFormats = new PhoneMetadataCollection();
-      alternateFormats.mergeFrom(byteBuffer);
-      for (PhoneMetadata metadata : alternateFormats.metadata) {
-        callingCodeToAlternateFormatsMap.put(metadata.countryCode, metadata);
-      }
-    } catch (IOException e) {
-      LOGGER.log(Level.WARNING, e.toString());
-    } finally {
-      close(in);
+    String fileName = ALTERNATE_FORMATS_FILE_PREFIX + "_" + countryCallingCode;
+    InputStream source = MetadataManager.class.getResourceAsStream(fileName);
+    if (source == null) {
+      // Sanity check; this should not happen since we only load things based on the expectation
+      // that they are present, by checking the map of available data first.
+      throw new IllegalStateException("missing metadata: " + fileName);
+    }
+    PhoneMetadataCollection alternateFormats = loadMetadataAndCloseInput(source);
+    for (PhoneMetadata metadata : alternateFormats.getMetadataList()) {
+      callingCodeToAlternateFormatsMap.put(metadata.getCountryCode(), metadata);
     }
   }
 
@@ -121,21 +123,16 @@ class MetadataManager {
   }
 
   private static void loadShortNumberMetadataFromFile(String regionCode) {
-    InputStream source = PhoneNumberMatcher.class.getResourceAsStream(
-        SHORT_NUMBER_METADATA_FILE_PREFIX + "_" + regionCode);
-    ObjectInputStream in = null;
-    try {
-      in = new ObjectInputStream(source);
-      CodedInputByteBufferNano byteBuffer = convertStreamToByteBuffer(in, BUFFER_SIZE);
-      PhoneMetadataCollection shortNumberMetadata = new PhoneMetadataCollection();
-      shortNumberMetadata.mergeFrom(byteBuffer);
-      for (PhoneMetadata metadata : shortNumberMetadata.metadata) {
-        regionCodeToShortNumberMetadataMap.put(regionCode, metadata);
-      }
-    } catch (IOException e) {
-      LOGGER.log(Level.WARNING, e.toString());
-    } finally {
-      close(in);
+    String fileName = SHORT_NUMBER_METADATA_FILE_PREFIX + "_" + regionCode;
+    InputStream source = MetadataManager.class.getResourceAsStream(fileName);
+    if (source == null) {
+      // Sanity check; this should not happen since we only load things based on the expectation
+      // that they are present, by checking the map of available data first.
+      throw new IllegalStateException("missing metadata: " + fileName);
+    }
+    PhoneMetadataCollection shortNumberMetadata = loadMetadataAndCloseInput(source);
+    for (PhoneMetadata metadata : shortNumberMetadata.getMetadataList()) {
+      regionCodeToShortNumberMetadataMap.put(regionCode, metadata);
     }
   }
 
