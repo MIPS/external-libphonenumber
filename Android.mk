@@ -73,7 +73,7 @@ include $(BUILD_STATIC_JAVA_LIBRARY)
 
 # Tests for unbundled use.
 # vogar --timeout 0 \
-    --classpath out/target/common/obj/JAVA_LIBRARIES/libphonenumber-test_intermediates/classes.jar \
+    --classpath out/target/common/obj/JAVA_LIBRARIES/libphonenumber-test_intermediates/classes.jack \
     com.google.i18n.phonenumbers
 include $(CLEAR_VARS)
 LOCAL_MODULE := libphonenumber-test
