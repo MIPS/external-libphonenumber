@@ -7,6 +7,9 @@ sourceSets.main {
         'internal/prefixmapper/src',
         'geocoder/src'
     ]
+    resources.srcDirs =[
+        'libphonenumber/src'
+    ]
 }
 
 dependencies {
