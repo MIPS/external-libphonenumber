@@ -13,6 +13,11 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
+if [ -z "$ANDROID_BUILD_TOP" ]; then
+    echo "Missing environment variables. Did you run build/envsetup.sh and lunch?" 1>&2
+    exit 1
+fi
+    
 VERSION=$1
 TAG=v$VERSION
 SOURCE="https://github.com/googlei18n/libphonenumber/"
