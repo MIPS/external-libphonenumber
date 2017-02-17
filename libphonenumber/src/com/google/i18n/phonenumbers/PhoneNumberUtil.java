@@ -313,9 +313,9 @@ public class PhoneNumberUtil {
     // One-character symbols that can be used to indicate an extension.
     String singleExtnSymbolsForMatching = "x\uFF58#\uFF03~\uFF5E";
     // For parsing, we are slightly more lenient in our interpretation than for matching. Here we
-    // allow a "comma" as a possible extension indicator. When matching, this is hardly ever used to
-    // indicate this.
-    String singleExtnSymbolsForParsing = "," + singleExtnSymbolsForMatching;
+    // allow "comma" and "semicolon" as possible extension indicators. When matching, these are
+    // hardly ever used to indicate this.
+    String singleExtnSymbolsForParsing = ",;" + singleExtnSymbolsForMatching;
 
     EXTN_PATTERNS_FOR_PARSING = createExtnPattern(singleExtnSymbolsForParsing);
     EXTN_PATTERNS_FOR_MATCHING = createExtnPattern(singleExtnSymbolsForMatching);
@@ -328,9 +328,9 @@ public class PhoneNumberUtil {
   private static String createExtnPattern(String singleExtnSymbols) {
     // There are three regular expressions here. The first covers RFC 3966 format, where the
     // extension is added using ";ext=". The second more generic one starts with optional white
-    // space and ends with an optional full stop (.), followed by zero or more spaces/tabs and then
-    // the numbers themselves. The other one covers the special case of American numbers where the
-    // extension is written with a hash at the end, such as "- 503#".
+    // space and ends with an optional full stop (.), followed by zero or more spaces/tabs/commas
+    // and then the numbers themselves. The other one covers the special case of American numbers
+    // where the extension is written with a hash at the end, such as "- 503#"
     // Note that the only capturing groups should be around the digits that you want to capture as
     // part of the extension, or else parsing will fail!
     // Canonical-equivalence doesn't seem to be an option with Android java, so we allow two options
@@ -440,9 +440,25 @@ public class PhoneNumberUtil {
    * Possible outcomes when testing if a PhoneNumber is possible.
    */
   public enum ValidationResult {
+    /** The number length matches that of valid numbers for this region. */
     IS_POSSIBLE,
+    /**
+     * The number length matches that of local numbers for this region only (i.e. numbers that may
+     * be able to be dialled within an area, but do not have all the information to be dialled from
+     * anywhere inside or outside the country).
+     */
+    IS_POSSIBLE_LOCAL_ONLY,
+    /** The number has an invalid country calling code. */
     INVALID_COUNTRY_CODE,
+    /** The number is shorter than all valid numbers for this region. */
     TOO_SHORT,
+    /**
+     * The number is longer than the shortest valid numbers for this region, shorter than the
+     * longest valid numbers for this region, and does not itself have a number length that matches
+     * valid numbers for this region.
+     */
+    INVALID_LENGTH,
+    /** The number is longer than all valid numbers for this region. */
     TOO_LONG,
   }
 
@@ -728,7 +744,7 @@ public class PhoneNumberUtil {
    * @param number  a string of characters representing a phone number
    * @return  the normalized string version of the phone number
    */
-  static String normalizeDiallableCharsOnly(String number) {
+  public static String normalizeDiallableCharsOnly(String number) {
     return normalizeHelper(number, DIALLABLE_CHAR_MAPPINGS, true /* remove non matches */);
   }
 
@@ -2135,7 +2151,11 @@ public class PhoneNumberUtil {
 
   /**
    * Tests whether a phone number matches a valid pattern. Note this doesn't verify the number
-   * is actually in use, which is impossible to tell by just looking at a number itself.
+   * is actually in use, which is impossible to tell by just looking at a number itself. It only
+   * verifies whether the parsed, canonicalised number is valid: not whether a particular series of
+   * digits entered by the user is diallable from the region provided when parsing. For example, the
+   * number +41 (0) 78 927 2696 can be parsed into a number with country code "41" and national
+   * significant number "789272696". This is valid, while the original string is not diallable.
    *
    * @param number  the phone number that we want to validate
    * @return  a boolean that indicates whether the number is of a valid pattern
@@ -2923,6 +2943,9 @@ public class PhoneNumberUtil {
    * parse() method, with the exception that it allows the default region to be null, for use by
    * isNumberMatch(). checkRegion should be set to false if it is permitted for the default region
    * to be null or unknown ("ZZ").
+   *
+   * Note if any new field is added to this method that should always be filled in, even when
+   * keepRawInput is false, it should also be handled in the copyCoreFieldsOnly() method.
    */
   private void parseHelper(String numberToParse, String defaultRegion, boolean keepRawInput,
                            boolean checkRegion, PhoneNumber phoneNumber)
@@ -3086,6 +3109,26 @@ public class PhoneNumberUtil {
   }
 
   /**
+   * Returns a new phone number containing only the fields needed to uniquely identify a phone
+   * number, rather than any fields that capture the context in which the phone number was created.
+   * These fields correspond to those set in parse() rather than parseHelper().
+   */
+  private static PhoneNumber copyCoreFieldsOnly(PhoneNumber phoneNumberIn) {
+    PhoneNumber phoneNumber = new PhoneNumber();
+    phoneNumber.setCountryCode(phoneNumberIn.getCountryCode());
+    phoneNumber.setNationalNumber(phoneNumberIn.getNationalNumber());
+    if (phoneNumberIn.getExtension().length() > 0) {
+      phoneNumber.setExtension(phoneNumberIn.getExtension());
+    }
+    if (phoneNumberIn.isItalianLeadingZero()) {
+      phoneNumber.setItalianLeadingZero(true);
+      // This field is only relevant if there are leading zeros at all.
+      phoneNumber.setNumberOfLeadingZeros(phoneNumberIn.getNumberOfLeadingZeros());
+    }
+    return phoneNumber;
+  }
+
+  /**
    * Takes two phone numbers and compares them for equality.
    *
    * <p>Returns EXACT_MATCH if the country_code, NSN, presence of a leading zero for Italian numbers
@@ -3106,27 +3149,10 @@ public class PhoneNumberUtil {
    *     of the two numbers, described in the method definition.
    */
   public MatchType isNumberMatch(PhoneNumber firstNumberIn, PhoneNumber secondNumberIn) {
-    // Make copies of the phone number so that the numbers passed in are not edited.
-    PhoneNumber firstNumber = new PhoneNumber();
-    firstNumber.mergeFrom(firstNumberIn);
-    PhoneNumber secondNumber = new PhoneNumber();
-    secondNumber.mergeFrom(secondNumberIn);
-    // First clear raw_input, country_code_source and preferred_domestic_carrier_code fields and any
-    // empty-string extensions so that we can use the proto-buffer equality method.
-    firstNumber.clearRawInput();
-    firstNumber.clearCountryCodeSource();
-    firstNumber.clearPreferredDomesticCarrierCode();
-    secondNumber.clearRawInput();
-    secondNumber.clearCountryCodeSource();
-    secondNumber.clearPreferredDomesticCarrierCode();
-    if (firstNumber.hasExtension()
-        && firstNumber.getExtension().length() == 0) {
-      firstNumber.clearExtension();
-    }
-    if (secondNumber.hasExtension()
-        && secondNumber.getExtension().length() == 0) {
-      secondNumber.clearExtension();
-    }
+    // We only care about the fields that uniquely define a number, so we copy these across
+    // explicitly.
+    PhoneNumber firstNumber = copyCoreFieldsOnly(firstNumberIn);
+    PhoneNumber secondNumber = copyCoreFieldsOnly(secondNumberIn);
     // Early exit if both had extensions and these are different.
     if (firstNumber.hasExtension() && secondNumber.hasExtension()
         && !firstNumber.getExtension().equals(secondNumber.getExtension())) {

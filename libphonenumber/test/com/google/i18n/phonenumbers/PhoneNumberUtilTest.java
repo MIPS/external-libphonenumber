@@ -2262,6 +2262,9 @@ public class PhoneNumberUtilTest extends TestMetadataTestCase {
     usWithExtension.setCountryCode(1).setNationalNumber(8009013355L).setExtension("7246433");
     assertEquals(usWithExtension, phoneUtil.parse("(800) 901-3355 x 7246433", RegionCode.US));
     assertEquals(usWithExtension, phoneUtil.parse("(800) 901-3355 , ext 7246433", RegionCode.US));
+    assertEquals(usWithExtension, phoneUtil.parse("(800) 901-3355 ; 7246433", RegionCode.US));
+    // To test an extension character without surrounding spaces.
+    assertEquals(usWithExtension, phoneUtil.parse("(800) 901-3355;7246433", RegionCode.US));
     assertEquals(usWithExtension,
                  phoneUtil.parse("(800) 901-3355 ,extension 7246433", RegionCode.US));
     assertEquals(usWithExtension,
@@ -2405,6 +2408,8 @@ public class PhoneNumberUtilTest extends TestMetadataTestCase {
     // Test numbers with extensions.
     assertEquals(PhoneNumberUtil.MatchType.EXACT_MATCH,
                  phoneUtil.isNumberMatch("+64 3 331-6005 extn 1234", "+6433316005#1234"));
+    assertEquals(PhoneNumberUtil.MatchType.EXACT_MATCH,
+                 phoneUtil.isNumberMatch("+64 3 331-6005 ext. 1234", "+6433316005;1234"));
     // Test proto buffers.
     assertEquals(PhoneNumberUtil.MatchType.EXACT_MATCH,
                  phoneUtil.isNumberMatch(NZ_NUMBER, "+6403 331 6005"));
@@ -2421,6 +2426,55 @@ public class PhoneNumberUtilTest extends TestMetadataTestCase {
                  PhoneNumberUtil.MatchType.EXACT_MATCH,
                  phoneUtil.isNumberMatch(nzNumber, NZ_NUMBER));
 
+  }
+
+  public void testIsNumberMatchShortMatchIfDiffNumLeadingZeros() throws Exception {
+    PhoneNumber nzNumberOne = new PhoneNumber();
+    PhoneNumber nzNumberTwo = new PhoneNumber();
+    nzNumberOne.setCountryCode(64).setNationalNumber(33316005L).setItalianLeadingZero(true);
+    nzNumberTwo.setCountryCode(64).setNationalNumber(33316005L).setItalianLeadingZero(true)
+        .setNumberOfLeadingZeros(2);
+    assertEquals(PhoneNumberUtil.MatchType.SHORT_NSN_MATCH,
+                 phoneUtil.isNumberMatch(nzNumberOne, nzNumberTwo));
+
+    nzNumberOne.setItalianLeadingZero(false).setNumberOfLeadingZeros(1);
+    nzNumberTwo.setItalianLeadingZero(true).setNumberOfLeadingZeros(1);
+    // Since one doesn't have the "italian_leading_zero" set to true, we ignore the number of
+    // leading zeros present (1 is in any case the default value).
+    assertEquals(PhoneNumberUtil.MatchType.SHORT_NSN_MATCH,
+                 phoneUtil.isNumberMatch(nzNumberOne, nzNumberTwo));
+  }
+
+  public void testIsNumberMatchAcceptsProtoDefaultsAsMatch() throws Exception {
+    PhoneNumber nzNumberOne = new PhoneNumber();
+    PhoneNumber nzNumberTwo = new PhoneNumber();
+    nzNumberOne.setCountryCode(64).setNationalNumber(33316005L).setItalianLeadingZero(true);
+    // The default for number_of_leading_zeros is 1, so it shouldn't normally be set, however if it
+    // is it should be considered equivalent.
+    nzNumberTwo.setCountryCode(64).setNationalNumber(33316005L).setItalianLeadingZero(true)
+        .setNumberOfLeadingZeros(1);
+    assertEquals(PhoneNumberUtil.MatchType.EXACT_MATCH,
+                 phoneUtil.isNumberMatch(nzNumberOne, nzNumberTwo));
+  }
+
+  public void testIsNumberMatchMatchesDiffLeadingZerosIfItalianLeadingZeroFalse() throws Exception {
+    PhoneNumber nzNumberOne = new PhoneNumber();
+    PhoneNumber nzNumberTwo = new PhoneNumber();
+    nzNumberOne.setCountryCode(64).setNationalNumber(33316005L);
+    // The default for number_of_leading_zeros is 1, so it shouldn't normally be set, however if it
+    // is it should be considered equivalent.
+    nzNumberTwo.setCountryCode(64).setNationalNumber(33316005L).setNumberOfLeadingZeros(1);
+    assertEquals(PhoneNumberUtil.MatchType.EXACT_MATCH,
+                 phoneUtil.isNumberMatch(nzNumberOne, nzNumberTwo));
+
+    // Even if it is set to ten, it is still equivalent because in both cases
+    // italian_leading_zero is not true.
+    nzNumberTwo.setNumberOfLeadingZeros(10);
+    assertEquals(PhoneNumberUtil.MatchType.EXACT_MATCH,
+                 phoneUtil.isNumberMatch(nzNumberOne, nzNumberTwo));
+  }
+
+  public void testIsNumberMatchIgnoresSomeFields() throws Exception {
     // Check raw_input, country_code_source and preferred_domestic_carrier_code are ignored.
     PhoneNumber brNumberOne = new PhoneNumber();
     PhoneNumber brNumberTwo = new PhoneNumber();
