@@ -38,7 +38,7 @@ java_library_static {
 
     jarjar_rules: "jarjar-rules.txt",
 
-    no_framework_libs: true,
+    sdk_version: "core_current",
     java_version: "1.7",
 }
 
